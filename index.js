@@ -13,7 +13,7 @@ app.use(cors({
 app.use(express.json());
 
 // Serve static frontend files
-app.use(express.static(path.join(__dirname, '../frontend/dist')));
+app.use(express.static(path.join(__dirname, './frontnend/dist')));
 
 const { generateAbsurdReport } = require('./reportGenerator');
 
