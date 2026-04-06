@@ -5,11 +5,15 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+app.use(cors({
+  origin: '*', // Allows any origin on Render
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // Serve static frontend files
-app.use(express.static(path.join(__dirname, './frontnend/dist')));
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 const { generateAbsurdReport } = require('./reportGenerator');
 
