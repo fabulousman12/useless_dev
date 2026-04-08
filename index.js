@@ -4,6 +4,7 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const URL_EXPIRY_MS = 15 * 60 * 1000;
 
 app.use(cors({
   origin: '*', // Allows any origin on Render
@@ -18,6 +19,20 @@ app.use(express.static(path.join(__dirname, './frontnend/dist')));
 const { generateAbsurdReport } = require('./reportGenerator');
 
 const urlDatabase = new Map();
+
+function storeUrlMapping(routeKey, targetUrl) {
+  const existingEntry = urlDatabase.get(routeKey);
+  if (existingEntry?.timeoutId) {
+    clearTimeout(existingEntry.timeoutId);
+  }
+
+  const expiresAt = Date.now() + URL_EXPIRY_MS;
+  const timeoutId = setTimeout(() => {
+    urlDatabase.delete(routeKey);
+  }, URL_EXPIRY_MS);
+
+  urlDatabase.set(routeKey, { targetUrl, expiresAt, timeoutId });
+}
 
 // Joke phrases based on domain
 const domainJokes = {
@@ -115,8 +130,8 @@ app.post('/lengthen', (req, res) => {
     newUrl.searchParams.append('you_got_this', 'true');
   }
 
-  // Save the mapping for redirect
-  urlDatabase.set(newUrl.pathname + newUrl.search, originalUrl.href);
+  // Save the mapping for redirect and remove it after 15 minutes.
+  storeUrlMapping(newUrl.pathname + newUrl.search, originalUrl.href);
 
   res.json({
     originalUrl: originalUrl.href,
@@ -129,8 +144,15 @@ app.post('/lengthen', (req, res) => {
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
 
-  const targetUrl = urlDatabase.get(req.url);
-  if (targetUrl) {
+  const mapping = urlDatabase.get(req.url);
+  if (mapping) {
+    if (mapping.expiresAt <= Date.now()) {
+      clearTimeout(mapping.timeoutId);
+      urlDatabase.delete(req.url);
+      return res.status(404).send('<h1>404 - Enterprise Route Expired</h1><p>This enterprise redirect has timed out after 15 minutes. Please generate a fresh one and re-align your synergy.</p>');
+    }
+
+    const targetUrl = mapping.targetUrl;
     const r = Math.random();
     if (r < 0.6) {
       return res.redirect(targetUrl);
